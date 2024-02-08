@@ -1,0 +1,8 @@
+{
+  "name": "youtube-app",
+  "version": "1.0.0",
+  "description": "Chai aur backend series",
+  "main": "index.js",
+  "author": "Deepak Mahto",
+  "license": "MIT"
+}
