@@ -2,7 +2,14 @@
   "name": "youtube-app",
   "version": "1.0.0",
   "description": "Chai aur backend series",
+  "type": "module",
   "main": "index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js"
+  },
   "author": "Deepak Mahto",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
 }
