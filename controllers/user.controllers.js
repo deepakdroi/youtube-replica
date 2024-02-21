@@ -3,13 +3,15 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import jsonwebtoken from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateAccessTokenAndRefreshToken = async (user_id) => {
   try {
     const user = await User.findById(user_id);
 
-    const accessToken = generateAccessToken();
-    const refreshToken = generateRefreshToken();
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
 
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
@@ -99,13 +101,13 @@ const loginUser = asyncHandler(async (req, res) => {
   //access and refresh token
   // send in cookies
 
-  const { email, username, password } = res.body;
+  const { email, username, password } = req.body;
 
   if (!username && !email) {
     throw new ApiError(400, "username or password is required");
   }
 
-  const user = User.findOne({
+  const user = await User.findOne({
     $or: [{ username }, { email }],
   });
 
@@ -133,8 +135,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .cookies("accessToken", accessToken, options)
-    .cookies("refreshToken", refreshToken, options)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
     .json(
       new ApiResponse(
         200,
@@ -152,8 +154,8 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1,
       },
     },
     {
@@ -169,7 +171,7 @@ const logoutUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .clearCookie("accessToken", options)
-    .clearCookie("refrehToken", options)
+    .clearCookie("refreshToken", options)
     .json(new ApiResponse(200, {}, "User Logged Out"));
 });
 
