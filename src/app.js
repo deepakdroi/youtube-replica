@@ -18,8 +18,10 @@ app.use(cookieParser());
 
 //import routers
 import userRouter from "../routes/user.routes.js";
+import videoRouter from "../routes/video.routes.js";
 
 //declaring routes
 app.use("/api/v2/user", userRouter);
+app.use("/api/v2/video", videoRouter);
 
 export default app;
