@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError";
 import { uploadOnCloudinary } from "../utils/cloudinary";
 import { Video } from "../models/video.model";
 import { ApiResponse } from "../utils/ApiResponse";
+import mongoose, { isValidObjectId } from "mongoose";
 
 //upload video by user
 const uploadVideo = asyncHandler(async (req, res) => {
@@ -64,8 +65,90 @@ const uploadVideo = asyncHandler(async (req, res) => {
 const getVideoById = asyncHandler(async (req, res) => {
   //check if user is autharized
   //get the video id from the url
+  const videoId = req.params.videoId;
+
+  //check if id is valid
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video Id");
+  }
   //check if the video exists in the db
+  const video = Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(400, "Video not found. Please try again");
+  }
+
+  let videoDetails = await Video.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(videoId),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "owner",
+        foreignField: "channel",
+        as: "SubscriberCount",
+      },
+    },
+    {
+      $lookup: {
+        from: "comments",
+        localField: "_id",
+        foreignField: "video",
+        as: "videoComment",
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              username: 1,
+              fullName: 1,
+              email: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        owner: {
+          $first: "$owner",
+        },
+        subscriberCount: {
+          $size: "$subscriberCount",
+        },
+        isSunscribed: {
+          $cond: {
+            if: { $in: [req.user._id, "$subscriberCount.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+        totalComments: {
+          $size: "$videoComments",
+        },
+      },
+    },
+  ]);
+
+  if (!videoDetails) {
+    throw new ApiError(404, "Video not found");
+  }
+
   //send response
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, videoDetails, "Video fetched succesfully"));
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
