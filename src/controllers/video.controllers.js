@@ -1,6 +1,6 @@
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiError } from "../utils/ApiError";
-import { uploadOnCloudinary } from "../utils/cloudinary";
+import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary";
 import { Video } from "../models/video.model";
 import { ApiResponse } from "../utils/ApiResponse";
 import mongoose, { isValidObjectId } from "mongoose";
@@ -40,8 +40,8 @@ const uploadVideo = asyncHandler(async (req, res) => {
 
   //create video object
   const video = await Video.create({
-    video: videoFile.url,
-    thumbnail: thumbnailFile.url,
+    videoFIle: { url: videoFile.url, public_id: videoFile.public_id },
+    thumbnail: { url: thumbnailFile.url, public_id: thumbnailFile.public_id },
     title,
     description,
     owner: req.user._id,
@@ -154,10 +154,53 @@ const getVideoById = asyncHandler(async (req, res) => {
 const deleteVideo = asyncHandler(async (req, res) => {
   //check if user is autharized
   //get the video id from the url
+  const videoId = req.params.videoId;
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video id. try again with valid video id");
+  }
   //check if the video exists in the db
+  const deleteVideo = Video.findById(videoId);
+  if (!deleteVideo) {
+    throw new ApiError(404, "Video not found");
+  }
   //check if the owner is the user
+  if (deleteVideo.owner != req.user._id) {
+    throw new ApiError(
+      400,
+      "You dont own the video so you can't delete the video"
+    );
+  }
   //delete the video from the databse and cloudinary
+  const videoFilePublicId = deleteVideo.videoFile.public_id;
+  const thumbnailPublicId = deleteVideo.thumbnailFile.public_id;
+
+  if (!videoFilePublicId || !thumbnailPublicId) {
+    throw new ApiError(400, "Video or thumbnail publicId not found");
+  }
+
+  const removeVideoFromCloudinary = await deleteFromCloudinary(
+    videoFilePublicId,
+    "video"
+  );
+  const removeThumbnailFromCloudinary = await deleteFromCloudinary(
+    thumbnailPublicId,
+    "image"
+  );
+
+  if (!removeVideoFromCloudinary || !removeThumbnailFromCloudinary) {
+    throw new ApiError(400, "Error while deleting file from cloudinary");
+  }
+
+  //delete videofile from db
+  const deleteMessage = await deleteVideo.deleteOne();
+
+  if (!deleteMessage) {
+    throw new ApiError(400, "Error while deleting video from db");
+  }
   //send response
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Video was deleted successfully"));
 });
 const updateVideo = asyncHandler(async (req, res) => {
   //check if user is autharized
